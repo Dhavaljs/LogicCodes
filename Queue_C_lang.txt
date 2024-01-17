@@ -1,0 +1,210 @@
+// Online C compiler to run C program online
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#define NVS_TRAP_PKT_QUEUE 512
+typedef uint8_t element_t;
+
+typedef struct 
+{
+	uint16_t isQueueInit;
+	uint16_t Space;
+	uint16_t ElementCount;
+	uint16_t FrontIdx;
+	uint16_t RearIdx;
+	uint16_t QueueSize;
+	element_t Buff[NVS_TRAP_PKT_QUEUE];
+}TrapPKTQueue_t;
+
+
+int SAlek_nvs_init(void);
+void vPrintTrapPktInfo(void);
+void vReadFromQueue(uint16_t Count);
+
+size_t TrapPKTQueueMltplElmntWrite(element_t *DataBufff, size_t tuSize);
+void TrapPKTQueueMltplElmntRead(element_t *DataBufff, size_t tuSize); 
+
+TrapPKTQueue_t gxTrapPKTQueue = 
+{
+	.isQueueInit = 123, 
+	.Space = 0xFFFF,
+	.ElementCount = 0xFFFF,
+	.FrontIdx = NVS_TRAP_PKT_QUEUE,
+	.RearIdx = NVS_TRAP_PKT_QUEUE,
+	.QueueSize = NVS_TRAP_PKT_QUEUE
+};
+
+/********************************************************************************
+ * Queue APIs of Debug UART
+ * *******************************************************************************/
+
+//====================================================================================
+//[=> NVS/Queue/Core APIs]
+size_t GetTrapPKTQueueSize(void)
+{// Now 'filledQueueSize' contains the number of elements in the circular queue.
+    #define QUEUESIZE NVS_TRAP_PKT_QUEUE
+    if(gxTrapPKTQueue.FrontIdx == NVS_TRAP_PKT_QUEUE)
+    {
+        return (QUEUESIZE - (((QUEUESIZE-1) - gxTrapPKTQueue.RearIdx) % QUEUESIZE));
+    }
+    
+    return (QUEUESIZE - ((QUEUESIZE + gxTrapPKTQueue.FrontIdx - gxTrapPKTQueue.RearIdx) % QUEUESIZE));
+}
+
+size_t GetTrapPKTQueueSpace(void)
+{// Now 'GetDBGQueueSpace' contains the available space in the circular queue.
+    #define QUEUESIZE NVS_TRAP_PKT_QUEUE
+    return NVS_TRAP_PKT_QUEUE - GetTrapPKTQueueSize();
+}
+
+void TrapPKTQueueWrite(element_t tData)
+{
+    if(!(gxTrapPKTQueue.FrontIdx == ((gxTrapPKTQueue.RearIdx + 1) % NVS_TRAP_PKT_QUEUE))) // true when queue has space
+    {
+        if(gxTrapPKTQueue.RearIdx == NVS_TRAP_PKT_QUEUE)
+        {
+            gxTrapPKTQueue.RearIdx = NVS_TRAP_PKT_QUEUE - 1;
+        }
+
+        gxTrapPKTQueue.RearIdx = (gxTrapPKTQueue.RearIdx + 1) % NVS_TRAP_PKT_QUEUE;
+        gxTrapPKTQueue.Buff[gxTrapPKTQueue.RearIdx] = tData;
+    }
+}
+
+element_t TrapPKTQueueRead(void) 
+{
+    element_t element = (element_t)(-1);  // invalid data value to show no element
+
+    if(gxTrapPKTQueue.FrontIdx != gxTrapPKTQueue.RearIdx)
+    {
+        if(gxTrapPKTQueue.FrontIdx == NVS_TRAP_PKT_QUEUE)
+        {
+            gxTrapPKTQueue.FrontIdx = NVS_TRAP_PKT_QUEUE-1;
+        }
+         gxTrapPKTQueue.FrontIdx = (gxTrapPKTQueue.FrontIdx + 1) % NVS_TRAP_PKT_QUEUE;  // Increament index by one
+        element = gxTrapPKTQueue.Buff[gxTrapPKTQueue.FrontIdx];
+       
+    }
+
+    return element;
+}
+
+element_t TrapPKTQueuePeek(uint16_t tIdx) 
+{
+    uint16_t FrontIdx = gxTrapPKTQueue.FrontIdx;
+    uint16_t RearIdx = gxTrapPKTQueue.RearIdx;
+    
+    element_t element = (element_t)(-1);  // invalid data value to show no element
+    tIdx = tIdx+1;
+    
+    while(tIdx)
+    {
+        if(FrontIdx != RearIdx)
+        {
+            if(FrontIdx == NVS_TRAP_PKT_QUEUE)
+            {
+                FrontIdx = NVS_TRAP_PKT_QUEUE-1;
+            }
+             FrontIdx = (FrontIdx + 1) % NVS_TRAP_PKT_QUEUE;  // Increament index by one
+            element = gxTrapPKTQueue.Buff[FrontIdx];
+        }
+        else
+        {
+            element = (element_t)(-1);
+            break;
+        }
+        tIdx--;
+    }
+    return element;
+}
+//====================================================================================
+//[=> Queue/Aplication APIs]
+size_t TrapPKTQueueMltplElmntWrite(element_t *DataBufff, size_t tuSize)
+{
+    size_t tuWRCnt = 0; // Write count
+    
+    while(tuWRCnt < tuSize)
+    {
+        TrapPKTQueueWrite(DataBufff[tuWRCnt]); // write element into queue
+        tuWRCnt++; // next charactor
+    }
+    
+    return tuWRCnt;
+}
+
+void TrapPKTQueueMltplElmntRead(element_t *DataBufff, size_t tuSize)
+{
+    size_t tuRDCnt = 0; // Write count
+    
+    if(DataBufff == NULL) return; // Return if null
+
+    while(tuRDCnt < tuSize)
+    {
+        DataBufff[tuRDCnt] = TrapPKTQueueRead();    // write element into queue
+        tuRDCnt++;                              // next charactor
+    }
+}
+
+void vReadFromQueue(uint16_t Count)
+{
+	printf("-vReadFromQueue----------------------\r\n");
+	for(uint16_t idx = 0; idx < Count; idx++)
+	{
+		if(idx%0xF == 0)
+		{
+			printf("\r\n");
+		}
+
+		uint8_t Data = TrapPKTQueueRead();
+		printf("%02X[%c] ", Data, Data);
+	}
+	printf("-vReadFromQueue END -------------------\r\n");
+}
+
+int main() {
+    // Write C code here
+    printf("Hello world");
+
+gxTrapPKTQueue.QueueSize = GetTrapPKTQueueSize();
+	gxTrapPKTQueue.Space = GetTrapPKTQueueSpace();
+    printf("\nSize : %d, space : %d\n", gxTrapPKTQueue.QueueSize, gxTrapPKTQueue.Space);
+    printf("\n%d", TrapPKTQueueMltplElmntWrite("ABCDEF", strlen("ABCDEF") ));
+    
+    printf("PEEK : ");
+    for(uint8_t idx = 0; idx < 10; idx++)
+    {
+        uint8_t Data = TrapPKTQueuePeek(idx);
+		printf("%02X[%c] ", Data, Data);
+    }
+    
+    printf("PEEK_END\n");
+
+    uint8_t Data = TrapPKTQueuePeek(1);
+		printf("PEEK : %02X[%c] ", Data, Data);
+    
+    gxTrapPKTQueue.QueueSize = GetTrapPKTQueueSize();
+	gxTrapPKTQueue.Space = GetTrapPKTQueueSpace();
+    printf("\nSize : %d, space : %d\n", gxTrapPKTQueue.QueueSize, gxTrapPKTQueue.Space);
+    // for(uint8_t idx = 0; idx < NVS_TRAP_PKT_QUEUE; idx++)
+    // {
+    //     printf("%02X ",gxTrapPKTQueue.Buff[idx]);
+    // }
+    vReadFromQueue(3);
+    gxTrapPKTQueue.QueueSize = GetTrapPKTQueueSize();
+	gxTrapPKTQueue.Space = GetTrapPKTQueueSpace();
+    printf("\nSize : %d, space : %d\n", gxTrapPKTQueue.QueueSize, gxTrapPKTQueue.Space);
+    vReadFromQueue(3);
+    gxTrapPKTQueue.QueueSize = GetTrapPKTQueueSize();
+	gxTrapPKTQueue.Space = GetTrapPKTQueueSpace();
+    printf("\nSize : %d, space : %d\n", gxTrapPKTQueue.QueueSize, gxTrapPKTQueue.Space);
+    printf("\n%d", TrapPKTQueueMltplElmntWrite("123456789", 9));
+    gxTrapPKTQueue.QueueSize = GetTrapPKTQueueSize();
+	gxTrapPKTQueue.Space = GetTrapPKTQueueSpace();
+    printf("\nSize : %d, space : %d\n", gxTrapPKTQueue.QueueSize, gxTrapPKTQueue.Space);
+    vReadFromQueue(4);
+    gxTrapPKTQueue.QueueSize = GetTrapPKTQueueSize();
+	gxTrapPKTQueue.Space = GetTrapPKTQueueSpace();
+    printf("\nSize : %d, space : %d\n", gxTrapPKTQueue.QueueSize, gxTrapPKTQueue.Space);
+    return 0;
+}
