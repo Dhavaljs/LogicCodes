@@ -41,21 +41,36 @@ TrapPKTQueue_t gxTrapPKTQueue =
 
 //====================================================================================
 //[=> NVS/Queue/Core APIs]
-size_t GetTrapPKTQueueSize(void)
+/*---------------------------------------------------------------------
+ * @brief   : GetTrapPKTQueueNumOfElmnt()
+ * @para    : none
+ * @retval  : size_t - Returns
+ * --------------------------------------------------------------------
+*/
+size_t GetTrapPKTQueueNumOfElmnt(void)
 {// Now 'filledQueueSize' contains the number of elements in the circular queue.
     #define QUEUESIZE NVS_TRAP_PKT_QUEUE
-    if(gxTrapPKTQueue.FrontIdx == NVS_TRAP_PKT_QUEUE)
+	if(gxTrapPKTQueue.FrontIdx == gxTrapPKTQueue.RearIdx)
+	{
+		gxTrapPKTQueue.ElementCount =  0;
+	}
+	else if(gxTrapPKTQueue.FrontIdx == NVS_TRAP_PKT_QUEUE)
     {
-        return (QUEUESIZE - (((QUEUESIZE-1) - gxTrapPKTQueue.RearIdx) % QUEUESIZE));
+		gxTrapPKTQueue.ElementCount = (QUEUESIZE - (((QUEUESIZE-1) - gxTrapPKTQueue.RearIdx) % QUEUESIZE));
     }
+	else
+	{
+		gxTrapPKTQueue.ElementCount =  (QUEUESIZE - ((QUEUESIZE + gxTrapPKTQueue.FrontIdx - gxTrapPKTQueue.RearIdx) % QUEUESIZE));
+	}
     
-    return (QUEUESIZE - ((QUEUESIZE + gxTrapPKTQueue.FrontIdx - gxTrapPKTQueue.RearIdx) % QUEUESIZE));
+	return gxTrapPKTQueue.ElementCount;
 }
 
 size_t GetTrapPKTQueueSpace(void)
 {// Now 'GetDBGQueueSpace' contains the available space in the circular queue.
     #define QUEUESIZE NVS_TRAP_PKT_QUEUE
-    return NVS_TRAP_PKT_QUEUE - GetTrapPKTQueueSize();
+	gxTrapPKTQueue.Space = NVS_TRAP_PKT_QUEUE - GetTrapPKTQueueNumOfElmnt();
+    return gxTrapPKTQueue.Space;
 }
 
 void TrapPKTQueueWrite(element_t tData)
